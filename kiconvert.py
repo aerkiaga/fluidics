@@ -18,6 +18,7 @@ project_lib_path = os.path.join(project_path, "scad")
 required_libraries = set()
 dependencies = set()
 layer_graphics_items = {}
+library_footprints = []
 circuit_pads = []
 
 def get_symbol(parent, name):
@@ -84,7 +85,18 @@ def convert_pad(element):
     required_libraries.add("kicad_layers")
 
 def convert_library_footprint(footprint, path):
-    pass
+    global library_footprints
+
+    pos = parse_pos(get_symbol(footprint, "at"))
+    layers = set()
+    for element in footprint:
+        if element_is_graphics_item(element):
+            layer = get_symbol(element, "layer")[1]
+            layers.add(layer)
+    layers_data = [sexpdata.Symbol("layers")]
+    layers_data.extend(layers)
+    footprint.append(layers_data)
+    library_footprints.append(footprint)
 
 def convert_regular_footprint(footprint):
     pos = parse_pos(get_symbol(footprint, "at"))
