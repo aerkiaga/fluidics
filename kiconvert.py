@@ -65,10 +65,10 @@ def element_is_graphics_item(element):
         if element[0] == sexpdata.Symbol(name):
             return True
     return False
-    
+
 def convert_graphics_item(element):
     global layer_graphics_items, required_libraries
-    
+
     layer = get_symbol(element, "layer")[1]
     if layer not in layer_graphics_items:
         layer_graphics_items[layer] = []
@@ -78,7 +78,7 @@ def convert_graphics_item(element):
 
 def convert_pad(element):
     global required_libraries
-    
+
     circuit_pads.append(element)
     required_libraries.add("kicad_pads")
     required_libraries.add("kicad_layers")
@@ -88,12 +88,12 @@ def convert_library_footprint(footprint, path):
 
 def convert_regular_footprint(footprint):
     pos = parse_pos(get_symbol(footprint, "at"))
-    
+
     def apply_relative(element, name):
         var = get_symbol(element, name)
         if var:
             (var[1], var[2]) = apply_pos((var[1], var[2]), pos)
-    
+
     for element in footprint:
         if type(element) != list:
             continue
@@ -133,6 +133,7 @@ required_libraries.add("kicad_layers")
 ##################################################################################################
 
 pos_to_layers = {}
+extents = ((1e+10, 1e+10), (-1e+10, -1e+10))
 
 for (layer, items) in layer_graphics_items.items():
     for item in items:
@@ -148,6 +149,10 @@ for (layer, items) in layer_graphics_items.items():
             if val not in pos_to_layers:
                 pos_to_layers[val] = set()
             pos_to_layers[val].add(layer)
+            extents = (
+                (min(val[0], extents[0][0]), min(val[1], extents[0][1])),
+                (max(val[0], extents[1][0]), max(val[1], extents[1][1]))
+            )
 
 for pad in circuit_pads:
     pos = parse_pos(get_symbol(pad, "at"))
@@ -173,7 +178,7 @@ for pad in circuit_pads:
 
 def get_sub_dependencies(dependency):
     global lib_path
-    
+
     r = set()
     src_path = os.path.join(lib_path, f"{dependency}.scad")
     with open(src_path, "rt") as f:
@@ -195,18 +200,18 @@ def get_sub_dependencies(dependency):
 
 def export_required_libraries(scad):
     global required_libraries, dependencies, lib_path, project_lib_path
-    
+
     if len(required_libraries) == 0:
         return
-    
+
     for required_library in sorted(required_libraries):
         scad.write(f"use <./scad/{required_library}.scad>\n")
-    
+
     if not os.path.isdir(project_lib_path):
         if os.path.exists(project_lib_path):
             raise Exception(f"{project_lib_path} exists, but is not a directory")
         os.mkdir(project_lib_path)
-    
+
     dependencies |= required_libraries
     new_deps = dependencies
     while len(new_deps) > 0:
@@ -226,12 +231,12 @@ def export_required_libraries(scad):
 
 def layer_index_from_name(name):
     global layer_definitions
-    
+
     return next(x for x in layer_definitions if type(x) == list and x[1] == name)[0]
 
 def layer_name_from_index(index):
     global layer_definitions
-    
+
     return next(x for x in layer_definitions if type(x) == list and x[0] == index)[1]
 
 def export_layer_calculations(scad):
@@ -259,8 +264,10 @@ def export_layer_calculations(scad):
     )
 
 def export_board_start(scad):
+    location = ((extents[0][0] + extents[1][0])/2, (extents[0][1] + extents[1][1])/2)
     scad.write(
         f"mirror([0, 1, 0])\n"
+        f"translate([{-location[0]}, {-location[1]}, 0])\n"
         f"board_assembly(\n"
         f"  invert = false,\n"
         f"  z_bounds = bounds_from_layers([\n"
@@ -349,7 +356,7 @@ def export_graphics_item(item, scad, *, force_fill = False):
 
 def export_circuit_items(scad):
     global layer_graphics_items
-    
+
     for (layer, items) in layer_graphics_items.items():
         if len(items) == 0:
             continue
@@ -364,7 +371,7 @@ def export_circuit_items(scad):
 
 def export_pads(scad):
     global circuit_pads
-    
+
     scad.write(
         f"/* PADS */\n"
     )
@@ -392,7 +399,7 @@ def export_pads(scad):
 
 def export_outline_items(scad):
     global layer_graphics_items
-    
+
     if "Edge.Cuts" not in layer_graphics_items:
         return
     for item in layer_graphics_items["Edge.Cuts"]:
@@ -416,4 +423,3 @@ with open(scad_path, "wt") as scad:
     export_outline_start(scad)
     export_outline_items(scad)
     export_board_end(scad)
-
