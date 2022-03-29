@@ -93,6 +93,7 @@ def convert_library_footprint(footprint, path):
         if element_is_graphics_item(element):
             layer = get_symbol(element, "layer")[1]
             layers.add(layer)
+        #TODO: pad layers
     layers_data = [sexpdata.Symbol("layers")]
     layers_data.extend(layers)
     footprint.append(layers_data)
@@ -423,10 +424,22 @@ def export_components(scad):
     )
     for component in library_footprints:
         pos = parse_pos(get_symbol(component, "at"))
+        layers = get_symbol(component, "layers")[1:]
         path = get_symbol(component, "scad_path")[1]
-        module = os.path.relpath(os.path.splitext(path)[0], start = lib_path).replace("/", "_")
+        module = os.path.relpath(os.path.splitext(path)[0], start = lib_path)\
+            .replace("/", "_").replace(".", "_")
         scad.write(
-            f"\n"
+            f"{module}([\n"
+            f"  [{pos[0]}, {pos[1]}],\n"
+            f"  [\n"
+        )
+        for layer in layers:
+            scad.write(
+                f"    \"{layer}\",\n"
+            )
+        scad.write(
+            f"  ]\n"
+            f"]);\n"
         )
 
 def export_outline_items(scad):
