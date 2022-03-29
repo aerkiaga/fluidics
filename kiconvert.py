@@ -98,6 +98,8 @@ def convert_library_footprint(footprint, path):
     footprint.append(layers_data)
     footprint.append([sexpdata.Symbol("scad_path"), path])
     library_footprints.append(footprint)
+    dependency = os.path.relpath(os.path.splitext(path)[0], start = lib_path)
+    required_libraries.add(dependency)
 
 def convert_regular_footprint(footprint):
     pos = parse_pos(get_symbol(footprint, "at"))
@@ -122,7 +124,7 @@ def convert_footprint(footprint):
     name = footprint[1].split(":", 1)
     footprint_path = os.path.join(lib_path, name[0], "{}.scad".format(name[1]))
     if os.path.isfile(footprint_path):
-        convert_library_footprint(footprint, path)
+        convert_library_footprint(footprint, footprint_path)
     else:
         convert_regular_footprint(footprint)
 
@@ -189,11 +191,6 @@ for pad in circuit_pads:
 
 ##################################################################################################
 
-for component in library_footprints:
-    dep_path = get_symbol(component, "scad_path")[1]
-    dependency = os.path.splitext(dep_path)[0]
-    required_libraries.add(dependency)
-
 def get_sub_dependencies(dependency):
     global lib_path
 
@@ -243,6 +240,8 @@ def export_required_libraries(scad):
     for dependency in sorted(dependencies):
         src_path = os.path.join(lib_path, f"{dependency}.scad")
         dst_path = os.path.join(project_lib_path, f"{dependency}.scad")
+        if not os.path.isdir(os.path.dirname(dst_path)):
+            os.mkdir(os.path.dirname(dst_path))
         shutil.copy(src_path, dst_path)
 
     scad.write(f"\n")
@@ -423,9 +422,11 @@ def export_components(scad):
         f"/* CUSTOM COMPONENTS */\n"
     )
     for component in library_footprints:
-        pos = parse_pos(get_symbol(pad, "at"))
+        pos = parse_pos(get_symbol(component, "at"))
+        path = get_symbol(component, "scad_path")[1]
+        module = os.path.relpath(os.path.splitext(path)[0], start = lib_path).replace("/", "_")
         scad.write(
-            f"/* CUSTOM COMPONENTS */\n"
+            f"\n"
         )
 
 def export_outline_items(scad):
