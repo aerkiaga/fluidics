@@ -96,6 +96,7 @@ def convert_library_footprint(footprint, path):
     layers_data = [sexpdata.Symbol("layers")]
     layers_data.extend(layers)
     footprint.append(layers_data)
+    footprint.append([sexpdata.Symbol("scad_path"), path])
     library_footprints.append(footprint)
 
 def convert_regular_footprint(footprint):
@@ -187,6 +188,11 @@ for pad in circuit_pads:
         input_layers.append(layer)
 
 ##################################################################################################
+
+for component in library_footprints:
+    dep_path = get_symbol(component, "scad_path")[1]
+    dependency = os.path.splitext(dep_path)[0]
+    required_libraries.add(dependency)
 
 def get_sub_dependencies(dependency):
     global lib_path
@@ -409,6 +415,19 @@ def export_pads(scad):
             f");\n"
         )
 
+def export_components(scad):
+    global library_footprints
+
+    scad.write(
+        f"\n"
+        f"/* CUSTOM COMPONENTS */\n"
+    )
+    for component in library_footprints:
+        pos = parse_pos(get_symbol(pad, "at"))
+        scad.write(
+            f"/* CUSTOM COMPONENTS */\n"
+        )
+
 def export_outline_items(scad):
     global layer_graphics_items
 
@@ -432,6 +451,7 @@ with open(scad_path, "wt") as scad:
     export_board_start(scad)
     export_circuit_items(scad)
     export_pads(scad)
+    export_components(scad)
     export_outline_start(scad)
     export_outline_items(scad)
     export_board_end(scad)
