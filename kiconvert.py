@@ -93,7 +93,6 @@ def convert_library_footprint(footprint, path):
         if element_is_graphics_item(element):
             layer = get_symbol(element, "layer")[1]
             layers.add(layer)
-        #TODO: pad layers
     layers_data = [sexpdata.Symbol("layers")]
     layers_data.extend(layers)
     footprint.append(layers_data)
